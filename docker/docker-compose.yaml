@@ -1,0 +1,28 @@
+services:
+  dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: dev
+      args:
+        ROS_DISTRO: jazzy
+    image: omx_arm:dev
+    container_name: omx_dev
+
+    stdin_open: true
+    tty: true
+
+    network_mode: host
+    ipc: host
+
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+
+    volumes:
+      - ..:/ws
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+
+    working_dir: /ws
+    command: bash
