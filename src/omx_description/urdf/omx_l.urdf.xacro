@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<robot name="omx_l" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:arg name="prefix" default="" />
+
+  <xacro:include filename="$(find omx_description)/urdf/omx_l_arm.urdf.xacro" />
+
+  <link name="world"/>
+
+  <joint name="$(arg prefix)world_fixed" type="fixed">
+    <parent link="world"/>
+    <child link="$(arg prefix)link0"/>
+    <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 機構本體（omx_l_arm.urdf.xacro 定義的 macro） -->
+  <xacro:omx_l prefix="$(arg prefix)" />
+
+</robot>

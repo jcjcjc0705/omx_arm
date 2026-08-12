@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<robot name="omx_f" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:arg name="prefix" default="" />
+
+  <xacro:include filename="$(find omx_description)/urdf/omx_f_arm.urdf.xacro" />
+
+  <link name="world"/>
+
+  <joint name="$(arg prefix)world_fixed" type="fixed">
+    <parent link="world"/>
+    <child link="$(arg prefix)link0"/>
+    <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="$(arg prefix)end_effector_joint" type="fixed">
+    <parent link="$(arg prefix)link5"/>
+    <child link="$(arg prefix)end_effector_link"/>
+    <origin xyz="0.09193 -0.0016 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="$(arg prefix)end_effector_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.01 0.01 0.01" />
+      </geometry>
+      <material name="red">
+        <color rgba="1.0 0.0 0.0 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- 機構本體（omx_f_arm.urdf.xacro 定義的 macro） -->
+  <xacro:omx_f prefix="$(arg prefix)" />
+
+</robot>
