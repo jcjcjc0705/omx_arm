@@ -1,6 +1,6 @@
 ARG ROS_DISTRO=jazzy
-LABEL org.opencontainers.image.source="https://github.com/jcjcjc0705/omx_arm"
 FROM ros:${ROS_DISTRO}-ros-base-noble AS base
+LABEL org.opencontainers.image.source="https://github.com/jcjcjc0705/omx_arm"
 
 ARG ROS_DISTRO
 ARG DEBIAN_FRONTEND=noninteractive
