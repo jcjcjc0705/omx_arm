@@ -6,7 +6,7 @@ services:
       target: dev
       args:
         ROS_DISTRO: jazzy
-    image: omx_arm:dev
+    image: ghcr.io/jcjcjc0705/omx_arm:dev
     container_name: omx_dev
 
     stdin_open: true
