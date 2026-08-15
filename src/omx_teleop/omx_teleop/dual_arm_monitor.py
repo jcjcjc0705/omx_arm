@@ -83,11 +83,6 @@ def snapshot(monitor):
 
 
 def addnstr(win, y, x, text, n, attr=0):
-    """ncurses raises when a write would push the cursor past the last cell.
-
-    A too-small terminal is a cosmetic problem, so drop the line rather than
-    taking down a monitor someone is watching mid-run.
-    """
     try:
         win.addnstr(y, x, text, n, attr)
     except curses.error:
@@ -139,9 +134,6 @@ def main():
     rclpy.init()
     monitor = DualArmMonitor(args)
 
-    # rclpy.spin racing rclpy.shutdown from the main thread can abort the
-    # process with DDS torn down mid-callback. Own the executor so it can be
-    # stopped first, in order.
     executor = SingleThreadedExecutor()
     executor.add_node(monitor)
     spin = threading.Thread(target=executor.spin, daemon=True)
