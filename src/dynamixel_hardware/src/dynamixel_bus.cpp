@@ -1,7 +1,6 @@
 #include "dynamixel_hardware/dynamixel_bus.hpp"
 
 #include <cmath>
-#include <sstream>
 #include <utility>
 
 namespace dynamixel_hardware
@@ -33,6 +32,8 @@ double DynamixelBus::raw_to_rad_per_s(int32_t raw)
 
 bool DynamixelBus::open()
 {
+  std::lock_guard<std::mutex> lock(port_mutex_);
+
   port_ = dynamixel::PortHandler::getPortHandler(port_name_.c_str());
   packet_ = dynamixel::PacketHandler::getPacketHandler(2.0);
 
@@ -54,6 +55,8 @@ bool DynamixelBus::open()
 
 void DynamixelBus::close()
 {
+  std::lock_guard<std::mutex> lock(port_mutex_);
+
   sync_read_.reset();
   sync_write_.reset();
   if (port_ != nullptr)
@@ -65,6 +68,8 @@ void DynamixelBus::close()
 
 bool DynamixelBus::configure(const std::vector<JointSpec> & joints)
 {
+  std::lock_guard<std::mutex> lock(port_mutex_);
+
   if (port_ == nullptr)
   {
     last_error_ = "Serial port not opened";
@@ -75,18 +80,18 @@ bool DynamixelBus::configure(const std::vector<JointSpec> & joints)
   for (auto & j : joints_)
   {
     uint16_t model = 0;
-    if (!ping(j.id, model)) { return false; }
+    if (!ping_unlocked(j.id, model)) { return false; }
     j.parameters["_detected_model_number"] = std::to_string(model);
   }
 
   for (const auto & j : joints_)
   {
-    if (!set_torque(j.id, false)) { return false; }
+    if (!set_torque_unlocked(j.id, false)) { return false; }
   }
 
   for (const auto & j : joints_)
   {
-    if (!set_operating_mode(j.id, j.operating_mode)) { return false; }
+    if (!set_operating_mode_unlocked(j.id, j.operating_mode)) { return false; }
     if (!apply_parameters(j)) { return false; }
   }
 
@@ -111,7 +116,7 @@ bool DynamixelBus::apply_parameters(const JointSpec & joint)
       return false;
     }
 
-    if (!write_register(joint.id, spec.address, spec.size, value))
+    if (!write_register_unlocked(joint.id, spec.address, spec.size, value))
     {
       last_error_ = std::string("Failed to write ") + spec.param_name + " (" + joint.name +
                     "): " + last_error_;
@@ -141,6 +146,8 @@ bool DynamixelBus::setup_sync()
 
 bool DynamixelBus::read_all(std::vector<JointFeedback> & out)
 {
+  std::lock_guard<std::mutex> lock(port_mutex_);
+
   out.assign(joints_.size(), JointFeedback{});
 
   const int rc = sync_read_->txRxPacket();
@@ -172,6 +179,8 @@ bool DynamixelBus::read_all(std::vector<JointFeedback> & out)
 
 bool DynamixelBus::write_positions(const std::vector<double> & rads)
 {
+  std::lock_guard<std::mutex> lock(port_mutex_);
+
   sync_write_->clearParam();
 
   for (std::size_t i = 0; i < joints_.size() && i < rads.size(); ++i)
@@ -197,6 +206,76 @@ bool DynamixelBus::write_positions(const std::vector<double> & rads)
 
 bool DynamixelBus::ping(uint8_t id, uint16_t & model_number)
 {
+  std::lock_guard<std::mutex> lock(port_mutex_);
+  return ping_unlocked(id, model_number);
+}
+
+bool DynamixelBus::set_torque(uint8_t id, bool on)
+{
+  std::lock_guard<std::mutex> lock(port_mutex_);
+  return set_torque_unlocked(id, on);
+}
+
+bool DynamixelBus::set_operating_mode(uint8_t id, const std::string & mode)
+{
+  std::lock_guard<std::mutex> lock(port_mutex_);
+  return set_operating_mode_unlocked(id, mode);
+}
+
+bool DynamixelBus::set_led(uint8_t id, bool on)
+{
+  std::lock_guard<std::mutex> lock(port_mutex_);
+  return write_register_unlocked(id, ct::LED, 1, on ? 1 : 0);
+}
+
+bool DynamixelBus::set_profile(uint8_t id, int32_t velocity, int32_t acceleration)
+{
+  std::lock_guard<std::mutex> lock(port_mutex_);
+  if (acceleration >= 0 && !write_register_unlocked(id, 108, 4, acceleration)) { return false; }
+  if (velocity >= 0 && !write_register_unlocked(id, 112, 4, velocity)) { return false; }
+  return true;
+}
+
+bool DynamixelBus::set_zero(uint8_t id)
+{
+  std::lock_guard<std::mutex> lock(port_mutex_);
+
+  if (!write_register_unlocked(id, ct::HOMING_OFFSET, 4, 0)) { return false; }
+
+  int64_t present = 0;
+  if (!read_register_unlocked(id, ct::PRESENT_POSITION, 4, present)) { return false; }
+
+  return write_register_unlocked(id, ct::HOMING_OFFSET, 4, -present);
+}
+
+bool DynamixelBus::reboot(uint8_t id)
+{
+  std::lock_guard<std::mutex> lock(port_mutex_);
+
+  uint8_t err = 0;
+  const int rc = packet_->reboot(port_, id, &err);
+  if (rc != COMM_SUCCESS)
+  {
+    last_error_ = "REBOOT failed (id=" + std::to_string(id) + "): " + packet_->getTxRxResult(rc);
+    return false;
+  }
+  return true;
+}
+
+bool DynamixelBus::read_register(uint8_t id, uint16_t address, uint8_t size, int64_t & value)
+{
+  std::lock_guard<std::mutex> lock(port_mutex_);
+  return read_register_unlocked(id, address, size, value);
+}
+
+bool DynamixelBus::write_register(uint8_t id, uint16_t address, uint8_t size, int64_t value)
+{
+  std::lock_guard<std::mutex> lock(port_mutex_);
+  return write_register_unlocked(id, address, size, value);
+}
+
+bool DynamixelBus::ping_unlocked(uint8_t id, uint16_t & model_number)
+{
   uint8_t err = 0;
   const int rc = packet_->ping(port_, id, &model_number, &err);
   if (rc != COMM_SUCCESS)
@@ -211,51 +290,18 @@ bool DynamixelBus::ping(uint8_t id, uint16_t & model_number)
   return true;
 }
 
-bool DynamixelBus::set_torque(uint8_t id, bool on)
+bool DynamixelBus::set_torque_unlocked(uint8_t id, bool on)
 {
-  return write_register(id, ct::TORQUE_ENABLE, 1, on ? 1 : 0);
+  return write_register_unlocked(id, ct::TORQUE_ENABLE, 1, on ? 1 : 0);
 }
 
-bool DynamixelBus::set_led(uint8_t id, bool on)
+bool DynamixelBus::set_operating_mode_unlocked(uint8_t id, const std::string & mode)
 {
-  return write_register(id, ct::LED, 1, on ? 1 : 0);
+  return write_register_unlocked(id, ct::OPERATING_MODE, 1, ct::operating_mode_value(mode));
 }
 
-bool DynamixelBus::reboot(uint8_t id)
-{
-  uint8_t err = 0;
-  const int rc = packet_->reboot(port_, id, &err);
-  if (rc != COMM_SUCCESS)
-  {
-    last_error_ = "REBOOT failed (id=" + std::to_string(id) + "): " + packet_->getTxRxResult(rc);
-    return false;
-  }
-  return true;
-}
-
-bool DynamixelBus::set_operating_mode(uint8_t id, const std::string & mode)
-{
-  return write_register(id, ct::OPERATING_MODE, 1, ct::operating_mode_value(mode));
-}
-
-bool DynamixelBus::set_profile(uint8_t id, int32_t velocity, int32_t acceleration)
-{
-  if (acceleration >= 0 && !write_register(id, 108, 4, acceleration)) { return false; }
-  if (velocity >= 0 && !write_register(id, 112, 4, velocity)) { return false; }
-  return true;
-}
-
-bool DynamixelBus::set_zero(uint8_t id)
-{
-  if (!write_register(id, ct::HOMING_OFFSET, 4, 0)) { return false; }
-
-  int64_t present = 0;
-  if (!read_register(id, ct::PRESENT_POSITION, 4, present)) { return false; }
-
-  return write_register(id, ct::HOMING_OFFSET, 4, -present);
-}
-
-bool DynamixelBus::read_register(uint8_t id, uint16_t address, uint8_t size, int64_t & value)
+bool DynamixelBus::read_register_unlocked(
+  uint8_t id, uint16_t address, uint8_t size, int64_t & value)
 {
   uint8_t err = 0;
   int rc = COMM_TX_FAIL;
@@ -297,7 +343,8 @@ bool DynamixelBus::read_register(uint8_t id, uint16_t address, uint8_t size, int
   return true;
 }
 
-bool DynamixelBus::write_register(uint8_t id, uint16_t address, uint8_t size, int64_t value)
+bool DynamixelBus::write_register_unlocked(
+  uint8_t id, uint16_t address, uint8_t size, int64_t value)
 {
   uint8_t err = 0;
   int rc = COMM_TX_FAIL;

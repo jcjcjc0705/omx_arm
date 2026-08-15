@@ -93,6 +93,8 @@ hardware_interface::CallbackReturn DynamixelSystem::on_init(
       s.name.c_str(), s.id, s.operating_mode.c_str(), s.commandable ? "position" : "(readonly)");
   }
 
+  create_services();
+
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -224,6 +226,121 @@ hardware_interface::return_type DynamixelSystem::write(
     RCLCPP_WARN_THROTTLE(hw_logger(), clk, 1000, "%s", bus_->last_error().c_str());
   }
   return hardware_interface::return_type::OK;
+}
+
+std::vector<uint8_t> DynamixelSystem::resolve_ids(uint8_t id) const
+{
+  std::vector<uint8_t> ids;
+  if (id == 0)
+  {
+    for (const auto & j : bus_->joints()) { ids.push_back(j.id); }
+  }
+  else
+  {
+    ids.push_back(id);
+  }
+  return ids;
+}
+
+void DynamixelSystem::create_services()
+{
+  auto node = get_node();
+  if (!node)
+  {
+    RCLCPP_WARN(hw_logger(), "Cannot get node, skipping service creation.");
+    return;
+  }
+
+  srv_set_torque_ = node->create_service<dynamixel_msgs::srv::SetTorque>(
+    "~/set_torque",
+    [this](
+      const std::shared_ptr<dynamixel_msgs::srv::SetTorque::Request> req,
+      std::shared_ptr<dynamixel_msgs::srv::SetTorque::Response> res)
+    {
+      res->success = true;
+      for (const auto id : resolve_ids(req->id))
+      {
+        if (!bus_->set_torque(id, req->enable))
+        {
+          res->success = false;
+          res->message = bus_->last_error();
+          return;
+        }
+      }
+      res->message = std::string("torque ") + (req->enable ? "enabled" : "disabled");
+    });
+
+  srv_reboot_ = node->create_service<dynamixel_msgs::srv::Reboot>(
+    "~/reboot",
+    [this](
+      const std::shared_ptr<dynamixel_msgs::srv::Reboot::Request> req,
+      std::shared_ptr<dynamixel_msgs::srv::Reboot::Response> res)
+    {
+      res->success = true;
+      for (const auto id : resolve_ids(req->id))
+      {
+        if (!bus_->reboot(id))
+        {
+          res->success = false;
+          res->message = bus_->last_error();
+          return;
+        }
+      }
+      res->message = "rebooted (torque is now off)";
+    });
+
+  srv_set_zero_ = node->create_service<dynamixel_msgs::srv::SetZero>(
+    "~/set_zero",
+    [this](
+      const std::shared_ptr<dynamixel_msgs::srv::SetZero::Request> req,
+      std::shared_ptr<dynamixel_msgs::srv::SetZero::Response> res)
+    {
+      res->success = true;
+      for (const auto id : resolve_ids(req->id))
+      {
+        if (!bus_->set_zero(id))
+        {
+          res->success = false;
+          res->message = bus_->last_error();
+          return;
+        }
+      }
+      res->message = "homing offset updated";
+    });
+
+  srv_read_register_ = node->create_service<dynamixel_msgs::srv::ReadRegister>(
+    "~/read_register",
+    [this](
+      const std::shared_ptr<dynamixel_msgs::srv::ReadRegister::Request> req,
+      std::shared_ptr<dynamixel_msgs::srv::ReadRegister::Response> res)
+    {
+      int64_t value = 0;
+      res->success = bus_->read_register(req->id, req->address, req->size, value);
+      res->value = value;
+      if (!res->success) { res->message = bus_->last_error(); }
+    });
+
+  srv_write_register_ = node->create_service<dynamixel_msgs::srv::WriteRegister>(
+    "~/write_register",
+    [this](
+      const std::shared_ptr<dynamixel_msgs::srv::WriteRegister::Request> req,
+      std::shared_ptr<dynamixel_msgs::srv::WriteRegister::Response> res)
+    {
+      res->success = true;
+      for (const auto id : resolve_ids(req->id))
+      {
+        if (!bus_->write_register(id, req->address, req->size, req->value))
+        {
+          res->success = false;
+          res->message = bus_->last_error();
+          return;
+        }
+      }
+    });
+
+  RCLCPP_INFO(
+    hw_logger(), "Created 5 services: set_torque / reboot / set_zero / "
+                 "read_register / write_register");
 }
 
 }  // namespace dynamixel_hardware

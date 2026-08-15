@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -18,8 +19,8 @@ struct JointSpec
   std::string name;
   uint8_t id{0};
   std::string operating_mode{"position"};
-  bool commandable{false};  ///< 有沒有 position command interface（leader 唯讀關節為 false）
-  std::unordered_map<std::string, std::string> parameters;  ///< URDF <param> 原封不動
+  bool commandable{false};
+  std::unordered_map<std::string, std::string> parameters;
 };
 
 struct JointFeedback
@@ -68,8 +69,15 @@ public:
   const std::string & last_error() const { return last_error_; }
 
 private:
+  bool ping_unlocked(uint8_t id, uint16_t & model_number);
+  bool set_torque_unlocked(uint8_t id, bool on);
+  bool set_operating_mode_unlocked(uint8_t id, const std::string & mode);
+  bool read_register_unlocked(uint8_t id, uint16_t address, uint8_t size, int64_t & value);
+  bool write_register_unlocked(uint8_t id, uint16_t address, uint8_t size, int64_t value);
   bool apply_parameters(const JointSpec & joint);
   bool setup_sync();
+
+  mutable std::mutex port_mutex_;
 
   std::string port_name_;
   int baud_rate_;

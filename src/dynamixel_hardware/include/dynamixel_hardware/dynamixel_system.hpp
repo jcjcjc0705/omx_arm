@@ -6,6 +6,11 @@
 #include <memory>
 
 #include "dynamixel_hardware/dynamixel_bus.hpp"
+#include "dynamixel_msgs/srv/read_register.hpp"
+#include "dynamixel_msgs/srv/reboot.hpp"
+#include "dynamixel_msgs/srv/set_torque.hpp"
+#include "dynamixel_msgs/srv/set_zero.hpp"
+#include "dynamixel_msgs/srv/write_register.hpp"
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/types/hardware_component_interface_params.hpp"
 #include "rclcpp/duration.hpp"
@@ -40,6 +45,8 @@ public:
 
 private:
   bool pull_states();
+  void create_services();
+  std::vector<uint8_t> resolve_ids(uint8_t id) const;
 
   std::unique_ptr<DynamixelBus> bus_;
 
@@ -56,6 +63,12 @@ private:
 
   std::vector<JointFeedback> feedback_;
   std::vector<double> commands_;
+
+  rclcpp::Service<dynamixel_msgs::srv::SetTorque>::SharedPtr srv_set_torque_;
+  rclcpp::Service<dynamixel_msgs::srv::Reboot>::SharedPtr srv_reboot_;
+  rclcpp::Service<dynamixel_msgs::srv::SetZero>::SharedPtr srv_set_zero_;
+  rclcpp::Service<dynamixel_msgs::srv::ReadRegister>::SharedPtr srv_read_register_;
+  rclcpp::Service<dynamixel_msgs::srv::WriteRegister>::SharedPtr srv_write_register_;
 };
 
 }  // namespace dynamixel_hardware
