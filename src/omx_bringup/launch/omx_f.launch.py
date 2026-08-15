@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, RegisterEventHandler
+from launch.actions import DeclareLaunchArgument, GroupAction, RegisterEventHandler
 from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import (
     Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution,
 )
-from launch_ros.actions import Node
+from launch_ros.actions import Node, PushRosNamespace
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
@@ -17,6 +17,8 @@ def generate_launch_description():
                               description='true = mock ; false = real hardware'),
         DeclareLaunchArgument('port_name', default_value='/dev/omx_follower',
                               description='Real hardware serial port'),
+        DeclareLaunchArgument('namespace', default_value='omx_follower',
+                              description='ROS namespace, lets both arms run at once'),
         DeclareLaunchArgument('rviz', default_value='false',
                               description='Whether to start RViz'),
     ]
@@ -59,6 +61,7 @@ def generate_launch_description():
 
     position_spawner = Node(
         package='controller_manager', executable='spawner',
+        namespace=LaunchConfiguration('namespace'),
         arguments=['position_controller'], output='screen',
     )
 
@@ -70,6 +73,9 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('rviz')), output='log',
     )
 
-    return LaunchDescription(declared_arguments + [
+    stack = GroupAction([
+        PushRosNamespace(LaunchConfiguration('namespace')),
         control_node, robot_state_publisher, jsb_spawner, delay_position, rviz_node,
     ])
+
+    return LaunchDescription(declared_arguments + [stack])

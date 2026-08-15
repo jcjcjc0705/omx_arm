@@ -47,9 +47,13 @@ class DxlDebug(Node):
 
         self._component = args.component or self._discover_component()
 
-        self.create_subscription(JointState, '/joint_states', self._on_state, 10)
+        ns = self._controller.rsplit('/', 1)[0] if '/' in self._controller else ''
+        prefix = f'/{ns}' if ns else ''
+        states = args.joint_states or f'{prefix}/joint_states'
+
+        self.create_subscription(JointState, states, self._on_state, 10)
         self.create_subscription(
-            DynamicJointState, '/dynamic_joint_states', self._on_dyn, 10)
+            DynamicJointState, f'{prefix}/dynamic_joint_states', self._on_dyn, 10)
         self._pub = self.create_publisher(
             Float64MultiArray, f'/{self._controller}/commands', 10)
 
@@ -57,20 +61,43 @@ class DxlDebug(Node):
         self._profile_mode = None
 
     def _discover_controller(self):
-        for _ in range(20):
-            for name, types in self.get_topic_names_and_types():
-                if name.endswith('/commands') and 'std_msgs/msg/Float64MultiArray' in types:
-                    return name.strip('/').rsplit('/', 1)[0]
-            rclpy.spin_once(self, timeout_sec=0.2)
-        return None
+        def probe():
+            return sorted(
+                name.strip('/').rsplit('/', 1)[0]
+                for name, types in self.get_topic_names_and_types()
+                if name.endswith('/commands')
+                and 'std_msgs/msg/Float64MultiArray' in types)
+
+        found = self._settle(probe)
+        if found and len(found) > 1:
+            print(f'multiple controllers found: {found}\n'
+                  f'using {found[0]}, pass --controller to pick another',
+                  file=sys.stderr)
+        return found[0] if found else None
+
+    def _settle(self, probe, settle=1.0, timeout=5.0):
+        """Let discovery fill in before deciding.
+
+        Returning on the first hit races the graph: with two stacks up, whichever
+        one is seen first wins and the other is silently ignored.
+        """
+        deadline = time.time() + timeout
+        quiet = time.time() + settle
+        found = []
+        while time.time() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.1)
+            found = probe()
+            if found and time.time() >= quiet:
+                break
+        return found
 
     def _discover_component(self):
-        for _ in range(10):
-            for name, types in self.get_service_names_and_types():
-                if name.endswith('/set_torque') and 'dynamixel_msgs/srv/SetTorque' in types:
-                    return name.rsplit('/', 1)[0]
-            rclpy.spin_once(self, timeout_sec=0.2)
-        return None
+        found = self._settle(lambda: sorted(
+            name.rsplit('/', 1)[0]
+            for name, types in self.get_service_names_and_types()
+            if name.endswith('/set_torque')
+            and 'dynamixel_msgs/srv/SetTorque' in types))
+        return found[0] if found else None
 
     def _controller_joints(self):
         """Command array order comes from the controller's own joints parameter."""
@@ -269,6 +296,8 @@ def build_parser():
                    help='controller name (auto-detected if omitted)')
     p.add_argument('--component', default=None,
                    help='hardware component namespace (auto-detected if omitted)')
+    p.add_argument('--joint-states', default=None,
+                   help='joint states topic (derived from the controller if omitted)')
     p.add_argument('--check', action='store_true',
                    help='print one state table and exit')
 

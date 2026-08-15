@@ -1,25 +1,26 @@
-controller_manager:
-  ros__parameters:
-    update_rate: 50
-    enforce_command_limits: true
+/**:
+  controller_manager:
+    ros__parameters:
+      update_rate: 50
+      enforce_command_limits: true
 
-    joint_state_broadcaster:
-      type: joint_state_broadcaster/JointStateBroadcaster
+      joint_state_broadcaster:
+        type: joint_state_broadcaster/JointStateBroadcaster
 
-    gripper_controller:
-      type: position_controllers/JointGroupPositionController
+      gripper_controller:
+        type: position_controllers/JointGroupPositionController
 
-joint_state_broadcaster:
-  ros__parameters:
-    joints:
-      - joint1
-      - joint2
-      - joint3
-      - joint4
-      - joint5
-      - gripper_joint_1
+  gripper_controller:
+    ros__parameters:
+      joints:
+        - gripper_joint_1
 
-gripper_controller:
-  ros__parameters:
-    joints:
-      - gripper_joint_1
+  joint_state_broadcaster:
+    ros__parameters:
+      joints:
+        - joint1
+        - joint2
+        - joint3
+        - joint4
+        - joint5
+        - gripper_joint_1

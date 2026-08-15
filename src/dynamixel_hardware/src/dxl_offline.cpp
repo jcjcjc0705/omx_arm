@@ -3,9 +3,9 @@
 // and therefore not holding the port. A motor stuck in Hardware Error, an
 // unknown ID or a wrong baud rate are all cases the ROS services cannot reach.
 //
-//   ros2 run dynamixel_hardware dxl_offline --port /dev/omx_follower scan
-//   ros2 run dynamixel_hardware dxl_offline --port /dev/omx_follower dump 11
-//   ros2 run dynamixel_hardware dxl_offline --port /dev/omx_follower reboot 13
+//   ros2 run dynamixel_hardware dxl_offline --port /dev/ttyUSB0 scan
+//   ros2 run dynamixel_hardware dxl_offline --port /dev/ttyUSB0 dump 11
+//   ros2 run dynamixel_hardware dxl_offline --port /dev/ttyUSB0 reboot 13
 
 #include <cstdlib>
 #include <cstring>

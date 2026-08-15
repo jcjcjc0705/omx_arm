@@ -1,5 +1,9 @@
 #include "dynamixel_hardware/dynamixel_bus.hpp"
 
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
+
 #include <cmath>
 #include <utility>
 
@@ -34,6 +38,21 @@ bool DynamixelBus::open()
 {
   std::lock_guard<std::mutex> lock(port_mutex_);
 
+  lock_fd_ = ::open(port_name_.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+  if (lock_fd_ < 0)
+  {
+    last_error_ = "Cannot open port: " + port_name_;
+    return false;
+  }
+  if (::flock(lock_fd_, LOCK_EX | LOCK_NB) != 0)
+  {
+    last_error_ = port_name_ + " is already locked by another process "
+                               "(another ros2_control stack or dxl_offline?)";
+    ::close(lock_fd_);
+    lock_fd_ = -1;
+    return false;
+  }
+
   port_ = dynamixel::PortHandler::getPortHandler(port_name_.c_str());
   packet_ = dynamixel::PacketHandler::getPacketHandler(2.0);
 
@@ -41,6 +60,7 @@ bool DynamixelBus::open()
   {
     last_error_ = "Cannot open port: " + port_name_;
     port_ = nullptr;
+    release_lock();
     return false;
   }
   if (!port_->setBaudRate(baud_rate_))
@@ -48,6 +68,7 @@ bool DynamixelBus::open()
     last_error_ = "Cannot set baud rate: " + std::to_string(baud_rate_);
     port_->closePort();
     port_ = nullptr;
+    release_lock();
     return false;
   }
   return true;
@@ -63,6 +84,17 @@ void DynamixelBus::close()
   {
     port_->closePort();
     port_ = nullptr;
+  }
+  release_lock();
+}
+
+void DynamixelBus::release_lock()
+{
+  if (lock_fd_ >= 0)
+  {
+    ::flock(lock_fd_, LOCK_UN);
+    ::close(lock_fd_);
+    lock_fd_ = -1;
   }
 }
 

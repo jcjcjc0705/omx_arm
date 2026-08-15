@@ -14,6 +14,7 @@ stopped, use the offline tool instead.
 
 import argparse
 import sys
+import time
 
 import rclpy
 from rclpy.node import Node
@@ -44,12 +45,23 @@ class DxlCli(Node):
 
     def _discover_component(self):
         """Find the hardware component namespace by looking for set_torque."""
-        for _ in range(10):
-            for name, types in self.get_service_names_and_types():
-                if name.endswith('/set_torque') and 'dynamixel_msgs/srv/SetTorque' in types:
-                    return name.rsplit('/', 1)[0]
-            rclpy.spin_once(self, timeout_sec=0.2)
-        return None
+        deadline = time.time() + 5.0
+        quiet = time.time() + 1.0
+        found = []
+        while time.time() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.1)
+            found = sorted(
+                name.rsplit('/', 1)[0]
+                for name, types in self.get_service_names_and_types()
+                if name.endswith('/set_torque')
+                and 'dynamixel_msgs/srv/SetTorque' in types)
+            if found and time.time() >= quiet:
+                break
+        if found and len(found) > 1:
+            print(f'multiple components found: {found}\n'
+                  f'using {found[0]}, pass --component to pick another',
+                  file=sys.stderr)
+        return found[0] if found else None
 
     def call(self, service, request, timeout=5.0):
         if service not in self._svc:

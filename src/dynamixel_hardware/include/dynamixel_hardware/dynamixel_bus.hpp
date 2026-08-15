@@ -80,6 +80,7 @@ private:
   bool set_operating_mode_unlocked(uint8_t id, const std::string & mode);
   bool read_register_unlocked(uint8_t id, uint16_t address, uint8_t size, int64_t & value);
   bool write_register_unlocked(uint8_t id, uint16_t address, uint8_t size, int64_t value);
+  void release_lock();
   bool apply_parameters(const JointSpec & joint);
   bool setup_sync();
 
@@ -88,6 +89,8 @@ private:
   std::string port_name_;
   int baud_rate_;
   std::string last_error_;
+
+  int lock_fd_{-1};
 
   dynamixel::PortHandler * port_{nullptr};
   dynamixel::PacketHandler * packet_{nullptr};

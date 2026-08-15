@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, RegisterEventHandler
+from launch.actions import (
+    DeclareLaunchArgument, ExecuteProcess, GroupAction, RegisterEventHandler,
+)
 from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import (
     Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution,
 )
-from launch_ros.actions import Node
+from launch_ros.actions import Node, PushRosNamespace
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
@@ -17,6 +19,12 @@ def generate_launch_description():
                               description='true = mock ; false = real hardware'),
         DeclareLaunchArgument('port_name', default_value='/dev/omx_leader',
                               description='Real hardware serial port'),
+        DeclareLaunchArgument('gripper_bias', default_value='-0.7',
+                              description='Constant target held by the trigger, rad. '
+                                          'current_based_position plus current_limit turns '
+                                          'it into a spring return rather than a hard stop.'),
+        DeclareLaunchArgument('namespace', default_value='omx_leader',
+                              description='ROS namespace, lets both arms run at once'),
         DeclareLaunchArgument('rviz', default_value='false',
                               description='Whether to start RViz'),
     ]
@@ -59,17 +67,34 @@ def generate_launch_description():
 
     gripper_spawner = Node(
         package='controller_manager', executable='spawner',
+        namespace=LaunchConfiguration('namespace'),
         arguments=['gripper_controller'], output='screen',
     )
 
     delay_gripper = RegisterEventHandler(
         OnProcessExit(target_action=jsb_spawner, on_exit=[gripper_spawner]))
 
+    gripper_bias_command = ExecuteProcess(
+        name='gripper_bias_command',
+        cmd=['ros2', 'topic', 'pub', '-r', '50', '-t', '50',
+             ['/', LaunchConfiguration('namespace'), '/gripper_controller/commands'],
+             'std_msgs/msg/Float64MultiArray',
+             ['data: [', LaunchConfiguration('gripper_bias'), ']']],
+        output='log',
+    )
+
+    delay_gripper_bias = RegisterEventHandler(
+        OnProcessExit(target_action=gripper_spawner, on_exit=[gripper_bias_command]))
+
     rviz_node = Node(
         package='rviz2', executable='rviz2', arguments=['-d', rviz_config],
         condition=IfCondition(LaunchConfiguration('rviz')), output='log',
     )
 
-    return LaunchDescription(declared_arguments + [
-        control_node, robot_state_publisher, jsb_spawner, delay_gripper, rviz_node,
+    stack = GroupAction([
+        PushRosNamespace(LaunchConfiguration('namespace')),
+        control_node, robot_state_publisher, jsb_spawner, delay_gripper,
+        delay_gripper_bias, rviz_node,
     ])
+
+    return LaunchDescription(declared_arguments + [stack])
