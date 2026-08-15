@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:include filename="$(find omx_description)/urdf/dxl_x_series.xacro"/>
+
+  <xacro:macro name="omx_l_system"
+               params="name prefix
+                       use_mock_hardware:=true port_name:=/dev/ttyACM1
+                       drive_mode:=4
+                       profile_velocity:=50 profile_acceleration:=25">
+
+    <ros2_control name="${name}" type="system">
+
+      <hardware>
+        <xacro:if value="${use_mock_hardware}">
+          <plugin>mock_components/GenericSystem</plugin>
+          <param name="calculate_dynamics">true</param>
+        </xacro:if>
+        <xacro:unless value="${use_mock_hardware}">
+          <plugin>omx_hardware/OmxSystem</plugin>
+          <param name="port_name">${port_name}</param>
+          <param name="baud_rate">1000000</param>
+        </xacro:unless>
+      </hardware>
+
+      <xacro:dxl_x_readonly_joint joint_name="${prefix}joint1" device_id="1"
+                                  operating_mode="extended_position"/>
+
+      <xacro:dxl_x_readonly_joint joint_name="${prefix}joint2" device_id="2"/>
+
+      <xacro:dxl_x_readonly_joint joint_name="${prefix}joint3" device_id="3"/>
+
+      <xacro:dxl_x_readonly_joint joint_name="${prefix}joint4" device_id="4"/>
+
+      <xacro:dxl_x_readonly_joint joint_name="${prefix}joint5" device_id="5"/>
+
+      <xacro:dxl_x_current_position_joint joint_name="${prefix}gripper_joint_1"
+                                          device_id="6"
+                                          current_limit="300"
+                                          position_d_gain="1500"
+                                          drive_mode="${drive_mode}"/>
+
+    </ros2_control>
+
+  </xacro:macro>
+</robot>
