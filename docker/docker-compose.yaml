@@ -20,6 +20,10 @@ services:
       - DISPLAY=${DISPLAY}
       - QT_X11_NO_MITSHM=1
 
+    devices:
+      - /dev/serial/by-id/usb-ROBOTIS_OpenRB-150_1E22E703503059384C2E3120FF07180A-if00:/dev/omx_follower
+      - /dev/serial/by-id/usb-ROBOTIS_OpenRB-150_01B5FC76503059384C2E3120FF083319-if00:/dev/omx_leader
+
     volumes:
       - ..:/ws
       - /tmp/.X11-unix:/tmp/.X11-unix:rw

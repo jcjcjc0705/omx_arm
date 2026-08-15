@@ -15,7 +15,7 @@ def generate_launch_description():
     declared_arguments = [
         DeclareLaunchArgument('use_mock_hardware', default_value='false',
                               description='true = mock ; false = real hardware'),
-        DeclareLaunchArgument('port_name', default_value='/dev/ttyACM0',
+        DeclareLaunchArgument('port_name', default_value='/dev/omx_follower',
                               description='Real hardware serial port'),
         DeclareLaunchArgument('rviz', default_value='false',
                               description='Whether to start RViz'),
