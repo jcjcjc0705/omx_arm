@@ -39,6 +39,11 @@ ament_target_dependencies(dynamixel_system PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS
 
 pluginlib_export_plugin_description_file(hardware_interface dynamixel_hardware.xml)
 
+# Offline rescue tool: links dynamixel_bus only, no ROS runtime needed.
+add_executable(dxl_offline src/dxl_offline.cpp)
+target_link_libraries(dxl_offline PRIVATE dynamixel_bus)
+install(TARGETS dxl_offline DESTINATION lib/${PROJECT_NAME})
+
 install(
   DIRECTORY include/
   DESTINATION include/${PROJECT_NAME}
