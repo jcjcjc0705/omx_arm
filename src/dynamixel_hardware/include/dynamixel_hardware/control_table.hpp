@@ -15,12 +15,17 @@ constexpr uint16_t HOMING_OFFSET = 20;
 constexpr uint16_t TORQUE_ENABLE = 64;
 constexpr uint16_t LED = 65;
 constexpr uint16_t GOAL_POSITION = 116;
+constexpr uint16_t HARDWARE_ERROR_STATUS = 70;
+constexpr uint16_t MOVING = 122;
+constexpr uint16_t PRESENT_PWM = 124;
 constexpr uint16_t PRESENT_CURRENT = 126;
 constexpr uint16_t PRESENT_VELOCITY = 128;
 constexpr uint16_t PRESENT_POSITION = 132;
+constexpr uint16_t PRESENT_INPUT_VOLTAGE = 144;
+constexpr uint16_t PRESENT_TEMPERATURE = 146;
 
-constexpr uint16_t SYNC_READ_START = PRESENT_CURRENT;
-constexpr uint16_t SYNC_READ_LENGTH = 10;
+constexpr uint16_t SYNC_READ_START = MOVING;
+constexpr uint16_t SYNC_READ_LENGTH = 25;
 constexpr uint16_t GOAL_POSITION_LENGTH = 4;
 
 constexpr double TICKS_PER_REV = 4096.0;

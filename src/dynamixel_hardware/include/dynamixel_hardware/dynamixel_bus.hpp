@@ -28,6 +28,12 @@ struct JointFeedback
   double position{0.0};  ///< rad
   double velocity{0.0};  ///< rad/s
   double effort{0.0};    ///< N·m
+  double temperature{0.0};    ///< deg C
+  double voltage{0.0};        ///< V
+  double pwm{0.0};            ///< raw
+  double moving{0.0};         ///< 0/1
+  double error{0.0};          ///< Hardware Error Status bitfield
+  double homing_offset{0.0};  ///< rad
   bool valid{false};     ///< no response
 };
 
@@ -89,6 +95,10 @@ private:
   std::unique_ptr<dynamixel::GroupSyncWrite> sync_write_;
 
   std::vector<JointSpec> joints_;
+
+  std::vector<double> homing_offset_;
+  std::vector<double> error_;
+  std::size_t error_cursor_{0};
 };
 
 }  // namespace dynamixel_hardware

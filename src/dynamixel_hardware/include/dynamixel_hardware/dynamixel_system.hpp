@@ -52,6 +52,7 @@ private:
 
   struct InterfaceKeys
   {
+    std::string name;
     std::string position_command;
     std::string position_state;
     std::string velocity_state;

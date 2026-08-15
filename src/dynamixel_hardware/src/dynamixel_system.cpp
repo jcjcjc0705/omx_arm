@@ -72,6 +72,7 @@ hardware_interface::CallbackReturn DynamixelSystem::on_init(
     k.position_state = joint.name + "/" + hardware_interface::HW_IF_POSITION;
     k.velocity_state = joint.name + "/" + hardware_interface::HW_IF_VELOCITY;
     k.effort_state = joint.name + "/" + hardware_interface::HW_IF_EFFORT;
+    k.name = joint.name;
 
     specs.push_back(spec);
     keys_.push_back(k);
@@ -194,6 +195,12 @@ bool DynamixelSystem::pull_states()
     set_state(keys_[i].position_state, feedback_[i].position);
     set_state(keys_[i].velocity_state, feedback_[i].velocity);
     set_state(keys_[i].effort_state, feedback_[i].effort);
+    set_state(keys_[i].name + "/temperature", feedback_[i].temperature);
+    set_state(keys_[i].name + "/voltage", feedback_[i].voltage);
+    set_state(keys_[i].name + "/pwm", feedback_[i].pwm);
+    set_state(keys_[i].name + "/moving", feedback_[i].moving);
+    set_state(keys_[i].name + "/error", feedback_[i].error);
+    set_state(keys_[i].name + "/homing_offset", feedback_[i].homing_offset);
   }
   return true;
 }

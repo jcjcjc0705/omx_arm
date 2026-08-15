@@ -95,6 +95,18 @@ bool DynamixelBus::configure(const std::vector<JointSpec> & joints)
     if (!apply_parameters(j)) { return false; }
   }
 
+  homing_offset_.assign(joints_.size(), 0.0);
+  error_.assign(joints_.size(), 0.0);
+  for (std::size_t i = 0; i < joints_.size(); ++i)
+  {
+    int64_t raw = 0;
+    if (read_register_unlocked(joints_[i].id, ct::HOMING_OFFSET, 4, raw))
+    {
+      homing_offset_[i] = static_cast<double>(raw) * (2.0 * M_PI / ct::TICKS_PER_REV);
+    }
+  }
+  error_cursor_ = 0;
+
   return setup_sync();
 }
 
@@ -171,9 +183,43 @@ bool DynamixelBus::read_all(std::vector<JointFeedback> & out)
         raw_to_rad_per_s(static_cast<int32_t>(sync_read_->getData(id, ct::PRESENT_VELOCITY, 4)));
     }
 
+    if (sync_read_->isAvailable(id, ct::PRESENT_PWM, 2))
+    {
+      out[i].pwm = static_cast<int16_t>(sync_read_->getData(id, ct::PRESENT_PWM, 2));
+    }
+    if (sync_read_->isAvailable(id, ct::MOVING, 1))
+    {
+      out[i].moving = static_cast<double>(sync_read_->getData(id, ct::MOVING, 1));
+    }
+    if (sync_read_->isAvailable(id, ct::PRESENT_INPUT_VOLTAGE, 2))
+    {
+      out[i].voltage =
+        static_cast<double>(sync_read_->getData(id, ct::PRESENT_INPUT_VOLTAGE, 2)) * 0.1;
+    }
+    if (sync_read_->isAvailable(id, ct::PRESENT_TEMPERATURE, 1))
+    {
+      out[i].temperature =
+        static_cast<double>(sync_read_->getData(id, ct::PRESENT_TEMPERATURE, 1));
+    }
+
     out[i].effort = 0.0;
+
+    out[i].homing_offset = homing_offset_[i];
+    out[i].error = error_[i];
     out[i].valid = true;
   }
+
+  if (!joints_.empty())
+  {
+    const std::size_t i = error_cursor_ % joints_.size();
+    int64_t raw = 0;
+    if (read_register_unlocked(joints_[i].id, ct::HARDWARE_ERROR_STATUS, 1, raw))
+    {
+      error_[i] = static_cast<double>(raw);
+    }
+    error_cursor_ = (error_cursor_ + 1) % joints_.size();
+  }
+
   return true;
 }
 
@@ -245,7 +291,16 @@ bool DynamixelBus::set_zero(uint8_t id)
   int64_t present = 0;
   if (!read_register_unlocked(id, ct::PRESENT_POSITION, 4, present)) { return false; }
 
-  return write_register_unlocked(id, ct::HOMING_OFFSET, 4, -present);
+  if (!write_register_unlocked(id, ct::HOMING_OFFSET, 4, -present)) { return false; }
+
+  for (std::size_t i = 0; i < joints_.size(); ++i)
+  {
+    if (joints_[i].id == id)
+    {
+      homing_offset_[i] = static_cast<double>(-present) * (2.0 * M_PI / ct::TICKS_PER_REV);
+    }
+  }
+  return true;
 }
 
 bool DynamixelBus::reboot(uint8_t id)

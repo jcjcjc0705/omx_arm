@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'dxl_cli = dynamixel_tools.dxl_cli:main',
+            'dxl_debug = dynamixel_tools.dxl_debug:main',
         ],
     },
 )
