@@ -1,4 +1,4 @@
-name: Build and push dev image
+name: Build and push images
 
 on:
   push:
@@ -10,7 +10,7 @@ env:
   IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
-  dev-image:
+  images:
     runs-on: ubuntu-latest
 
     permissions:
@@ -28,7 +28,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      - name: dev image
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile
@@ -39,5 +40,20 @@ jobs:
           tags: |
             ${{ env.IMAGE }}:dev
             ${{ env.IMAGE }}:dev-${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: runtime
+          push: true
+          build-args: |
+            ROS_DISTRO=jazzy
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

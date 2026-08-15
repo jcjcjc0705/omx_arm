@@ -18,6 +18,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ros-${ROS_DISTRO}-robot-state-publisher \
     && rm -rf /var/lib/apt/lists/*
 
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 FROM base AS dev
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -34,12 +37,36 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${USERNAME} \
  && chmod 0440 /etc/sudoers.d/${USERNAME}
 
-COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
 USER ${USERNAME}
 RUN rosdep update --rosdistro ${ROS_DISTRO}
 
+WORKDIR ${ROS2_WS}
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["bash"]
+
+FROM base AS builder
+
+ARG ROS_DISTRO
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3-colcon-common-extensions \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY src ./src
+
+RUN source /opt/ros/${ROS_DISTRO}/setup.bash -- \
+ && colcon build --merge-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+FROM base AS runtime
+
+ARG USERNAME=ubuntu
+ENV ROS2_WS=/opt/omx_arm
+
+COPY --from=builder /build/install ${ROS2_WS}/install
+
+USER ${USERNAME}
 WORKDIR ${ROS2_WS}
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]

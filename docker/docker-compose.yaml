@@ -1,3 +1,18 @@
+name: omx_arm
+
+x-runtime: &runtime
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+    target: runtime
+    args:
+      ROS_DISTRO: jazzy
+  image: ghcr.io/jcjcjc0705/omx_arm:latest
+  network_mode: host
+  ipc: host
+  environment:
+    - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+
 services:
   dev:
     build:
@@ -30,3 +45,20 @@ services:
 
     working_dir: /ws
     command: bash
+
+  follower:
+    <<: *runtime
+    devices:
+      - /dev/serial/by-id/usb-ROBOTIS_OpenRB-150_1E22E703503059384C2E3120FF07180A-if00:/dev/omx_follower
+    command: ros2 launch omx_bringup omx_f.launch.py
+
+  leader:
+    <<: *runtime
+    devices:
+      - /dev/serial/by-id/usb-ROBOTIS_OpenRB-150_01B5FC76503059384C2E3120FF083319-if00:/dev/omx_leader
+    command: ros2 launch omx_bringup omx_l.launch.py
+
+  teleop:
+    <<: *runtime
+    depends_on: [follower, leader]
+    command: ros2 launch omx_teleop omx_teleop.launch.py
